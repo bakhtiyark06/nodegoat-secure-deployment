@@ -1,162 +1,162 @@
-# NodeGoat
+# NodeGoat Secure Deployment
 
-Being lightweight, fast, and scalable, Node.js is becoming a widely adopted platform for developing web applications. This project provides an environment to learn how OWASP Top 10 security risks apply to web applications developed using Node.js and how to effectively address them.
+## Project Overview
 
-## Getting Started
+This project demonstrates a secure production-style deployment of the OWASP NodeGoat application using Docker containers, MongoDB, Docker networking, persistent volumes, and an NGINX reverse proxy.
 
-OWASP Top 10 for Node.js web applications:
+The goal of this project was to containerize the application, configure inter-container communication, and expose the application securely through NGINX.
 
-### Know it!
+---
 
-This application bundled a tutorial page that explains the OWASP Top 10 vulnerabilities and how to fix them.
+# Technologies Used
 
-Once the application is running, you can access the tutorial page at [http://localhost:4000/tutorial](http://localhost:4000/tutorial) (or the port you have configured).
+* Docker
+* Docker Networks
+* Docker Volumes
+* MongoDB
+* Node.js
+* NGINX
+* GitHub
 
-### Do it!
+---
 
-[A Vulnerable Node.js App for Ninjas](http://nodegoat.herokuapp.com/) to exploit, toast, and fix. You may like to [set up your own copy](#how-to-set-up-your-copy-of-nodegoat) of the app to fix and test vulnerabilities. Hint: Look for comments in the source code.
+# Project Architecture
 
-##### Default user accounts
+The deployment consists of three main containers:
 
-The database comes pre-populated with these user accounts created as part of the seed data -
-* Admin Account - u:`admin` p:`Admin_123`
-* User Accounts (u:`user1` p:`User1_123`), (u:`user2` p:`User2_123`)
-* New users can also be added using the sign-up page.
+1. MongoDB Database Container
+2. NodeGoat Application Container
+3. NGINX Reverse Proxy Container
 
-## How to Set Up Your Copy of NodeGoat
+All containers communicate through a custom Docker bridge network called:
 
-### OPTION 1 - Run NodeGoat on your machine
+```bash
+nodegoat-network
+```
 
-1) Install [Node.js](http://nodejs.org/) - NodeGoat requires Node v8 or above
+Persistent database storage is handled using a Docker volume:
 
-2) Clone the github repository:
-   ```
-   git clone https://github.com/OWASP/NodeGoat.git
-   ```
+```bash
+mongodb-data
+```
 
-3) Go to the directory:
-   ```
-   cd NodeGoat
-   ```
+---
 
-4) Install node packages:
-   ```
-   npm install
-   ```
+# Docker Image Build
 
-5) Set up MongoDB. You can either install MongoDB locally or create a remote instance:
+The NodeGoat application image was built using the following command:
 
-   * Using local MongoDB:
-     1) Install [MongoDB Community Server](https://docs.mongodb.com/manual/administration/install-community/)
-     2) Start [mongod](http://docs.mongodb.org/manual/reference/program/mongod/#bin.mongod)
+```bash
+docker build -t nodegoat-secure:v1 .
+```
 
-   * Using remote MongoDB instance:
-     1) [Deploy a MongoDB Atlas free tier cluster](https://docs.atlas.mongodb.com/tutorial/deploy-free-tier-cluster/) (M0 Sandbox)
-     2) [Enable network access](https://docs.atlas.mongodb.com/security/add-ip-address-to-list/) to the cluster from your current IP address
-     3) [Add a database user](https://docs.atlas.mongodb.com/tutorial/create-mongodb-user-for-cluster/) to the cluster
-     4) Set the `MONGODB_URI` environment variable to the connection string of your cluster, which can be viewed in the cluster's
-        [connect dialog](https://docs.atlas.mongodb.com/tutorial/connect-to-your-cluster/#connect-to-your-atlas-cluster). Select "Connect your application",
-        set the driver to "Node.js" and the version to "2.2.12 or later". This will give a connection string in the form:
-        ```
-        mongodb://<username>:<password>@<cluster>/<dbname>?ssl=true&replicaSet=<rsname>&authSource=admin&retryWrites=true&w=majority
-        ```
-        The `<username>` and `<password>` fields need filling in with the details of the database user added earlier. The `<dbname>` field sets the name of the
-        database nodegoat will use in the cluster (eg "nodegoat"). The other fields will already be filled in with the correct details for your cluster.
+---
 
-6) Populate MongoDB with the seed data required for the app:
-   ```
-   npm run db:seed
-   ```
-   By default this will use the "development" configuration, but the desired config can be passed as an argument if required.
+# Docker Network Creation
 
-7) Start the server. You can run the server using node or nodemon:
-   * Start the server with node. This starts the NodeGoat application at [http://localhost:4000/](http://localhost:4000/):
-     ```
-     npm start
-     ```
-   * Start the server with nodemon, which will automatically restart the application when you make any changes. This starts the NodeGoat application at [http://localhost:5000/](http://localhost:5000/):
-     ```
-     npm run dev
-     ```
+```bash
+docker network create nodegoat-network
+```
 
-#### Customizing the Default Application Configuration
+---
 
-By default the application will be hosted on port 4000 and will connect to a MongoDB instance at localhost:27017. To change this set the environment variables `PORT` and `MONGODB_URI`.
+# Docker Volume Creation
 
-Other settings can be changed by updating the [config file](https://github.com/OWASP/NodeGoat/blob/master/config/env/all.js).
+```bash
+docker volume create mongodb-data
+```
 
-### OPTION 2 - Run NodeGoat on Docker
+---
 
-The repo includes the Dockerfile and docker-compose.yml necessary to set up the app and db instance, then connect them together.
+# MongoDB Container
 
-1) Install [docker](https://docs.docker.com/installation/) and [docker compose](https://docs.docker.com/compose/install/) 
+```bash
+docker run -d --name mongodb \
+--network nodegoat-network \
+-v mongodb-data:/data/db \
+mongo:4.2
+```
 
-2) Clone the github repository:
-   ```
-   git clone https://github.com/OWASP/NodeGoat.git
-   ```
+---
 
-3) Go to the directory:
-   ```
-   cd NodeGoat
-   ```
+# NodeGoat Application Container
 
-4) Build the images:
-   ```
-   docker-compose build
-   ```
+```bash
+docker run -d --name nodegoat-app \
+--network nodegoat-network \
+-p 4000:4000 \
+-e MONGO_URL=mongodb://mongodb:27017/nodegoat \
+nodegoat-secure:v1
+```
 
-5) Run the app, this starts the NodeGoat application at http://localhost:4000/:
-   ```
-   docker-compose up
-   ```
+---
 
-### OPTION 3 - Deploy to Heroku
+# NGINX Reverse Proxy
 
-This option uses a free ($0/month) Heroku node server.
+An NGINX reverse proxy was configured to securely expose the application on port 80.
 
-Though not essential, it is recommended that you fork this repository and deploy the forked repo.
-This will allow you to fix vulnerabilities in your own forked version, then deploy and test it on Heroku.
+The reverse proxy forwards requests to the NodeGoat application container running on port 4000.
 
-1) Set up a publicly accessible MongoDB instance:
-   1) [Deploy a MongoDB Atlas free tier cluster](https://docs.atlas.mongodb.com/tutorial/deploy-free-tier-cluster/) (M0 Sandbox)
-   2) [Enable network access](https://docs.atlas.mongodb.com/security/ip-access-list/#add-ip-access-list-entries) to the cluster from anywhere (CIDR range 0.0.0.0/0)
-   3) [Add a database user](https://docs.atlas.mongodb.com/tutorial/create-mongodb-user-for-cluster/) to the cluster
+Example configuration:
 
-2) Deploy NodeGoat to Heroku by clicking the button below:
+```nginx
+server {
+    listen 80;
+    server_tokens off;
 
-   [![Deploy](https://www.herokucdn.com/deploy/button.png)](https://heroku.com/deploy)
+    gzip on;
 
-   In the Create New App dialog, set the `MONGODB_URI` config var to the connection string of your MongoDB Atlas cluster.
-   This can be viewed in the cluster's [connect dialog](https://docs.atlas.mongodb.com/tutorial/connect-to-your-cluster/#connect-to-your-atlas-cluster).
-   Select "Connect your application", set the driver to "Node.js" and the version to "2.2.12 or later".
-   This will give a connection string in the form:
-   ```
-   mongodb://<username>:<password>@<cluster>/<dbname>?ssl=true&replicaSet=<rsname>&authSource=admin&retryWrites=true&w=majority
-   ```
-   The `<username>` and `<password>` fields need filling in with the details of the database user added earlier. The `<dbname>` field sets the name of the
-   database nodegoat will use in the cluster (eg "nodegoat"). The other fields will already be filled in with the correct details for your cluster.
+    add_header X-Frame-Options SAMEORIGIN;
+    add_header X-Content-Type-Options nosniff;
 
-## Report bugs, Feedback, Comments
+    location / {
+        proxy_pass http://nodegoat-app:4000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
 
-*  Open a new [issue](https://github.com/OWASP/NodeGoat/issues) or contact team by joining chat at [Slack](https://owasp.slack.com/messages/project-nodegoat/) or [![Join the chat at https://gitter.im/OWASP/NodeGoat](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/OWASP/NodeGoat?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+---
 
-## Contributing
+# Monitoring and Troubleshooting Commands
 
-Please Follow [the contributing guide](CONTRIBUTING.md)
+The following Docker commands were used during deployment and troubleshooting:
 
-## Code Of Conduct (CoC)
+```bash
+docker ps
+docker logs nodegoat-app
+docker inspect nodegoat-app
+docker network inspect nodegoat-network
+docker volume inspect mongodb-data
+docker stats
+```
 
-This project is bound by a [Code of Conduct](CODE_OF_CONDUCT.md).
+---
 
-## Contributors
+# Screenshots Included
 
-Here are the amazing [contributors](https://github.com/OWASP/NodeGoat/graphs/contributors) to the NodeGoat project.
+The project includes screenshots demonstrating:
 
-## Supports
+* Docker containers running
+* Docker networking
+* Docker volumes
+* NGINX reverse proxy configuration
+* NodeGoat application running on localhost
+* Monitoring and troubleshooting commands
 
-- Thanks to JetBrains for providing licenses to fantastic [WebStorm IDE](https://www.jetbrains.com/webstorm/) to build this project.
+---
 
-## License
+# GitHub Repository
 
-Code licensed under the [Apache License v2.0.](http://www.apache.org/licenses/LICENSE-2.0)
+Repository Link:
+
+```txt
+https://github.com/bakhtiyark06/nodegoat-secure-deployment
+```
+
+---
+
+# Conclusion
+
+This project successfully demonstrates containerized application deployment using Docker with persistent storage, networking, reverse proxy configuration, and monitoring tools in a production-style environment.
